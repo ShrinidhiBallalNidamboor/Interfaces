@@ -1,10 +1,8 @@
 import time
-configuration=[8,2,3]
+configuration=[2]
 
-def configure(speed_data, length_data_index, packet_rate):
+def configure(speed_data):
     configuration[0]=speed_data
-    configuration[1]=length_data_index*8
-    configuration[2]=packet_rate
 
 def entermessage():
     message=input('Enter message: ')
@@ -21,64 +19,99 @@ def entermessage():
         array+=value[::-1]
     return ''.join(array)
 
-def packagemessage(message):
-    print('Packaging messages...')
-    result=[]
-    length=len(message)
-    for i in range(0, length, configuration[2]):
-        result.append(message[i:i+configuration[2]])
-    length=len(result)
-    for i in range(length):
-        result[i]=configuration[0]+result[i]+parity(result[i])+configuration[1]
-    return result
-
 def setpin(bit, jumper):
     with open(jumper, 'w') as file:
         file.write(bit)
-    time.sleep(configuration[3])
+    time.sleep(configuration[0])
 
-def sendpackets(packets, jumper):
+def synchronize(clock):
+    with open(clock, 'r') as clk:
+        temp=clk.read()
+        while True:
+            with open(clock, 'r') as clk:
+                data=clk.read()
+                if data!=temp:
+                    break
+def start(clock, sda):
+    while True:        
+        with open(clock, 'r') as file:
+            data=file.read()
+            if data=='1':
+                time.sleep(configuration[0]//2)
+                with open(sda, 'w') as file:
+                    file.write('0')
+                time.sleep(configuration[0]//2)
+                break
+
+def end(clock, sda):
+    while True:        
+        with open(clock, 'r') as file:
+            data=file.read()
+            if data=='1':
+                time.sleep(configuration[0]//2)
+                with open(sda, 'w') as file:
+                    file.write('1')
+                time.sleep(configuration[0]//2)
+                break
+
+def toggleclock(clock):
+    with open(clock, 'w') as file:
+        file.write('1')
+    value='1'
+    while True:
+        with open(clock, 'w') as file:
+            file.write(value)
+        if value=='1':
+            value='0'
+        else:
+            value='1'
+        time.sleep(configuration[0])
+
+def sendpackets(clock, message, sda):
     print('Sending packets...')
-    number=0
-    for packet in packets:
-        for bit in packet:
-            setpin(bit, jumper)
-        print('Packet sent: ', number, packet)
-        number+=1
-        time.sleep(configuration[4])
-
+    synchronize(clock)
+    start(clock, sda)
+    for bit in message:
+        setpin(bit, sda)
+    end(clock, sda)
+    
 def decrptMessage(message):
+    print(message)
+    message=''.join(message)
     length=len(message)
     string=''
     for i in range(0, length, 8):
         string+=chr(int(message[i:i+8],2))
     return string
 
-def decryptpacket(buffer):
-    start=''.join(buffer[:len(configuration[0])])
-    stop=''.join(buffer[-len(configuration[1]):])
-    data=''.join(buffer[len(configuration[0]):len(configuration[0])+configuration[2]])
-    paritybit=buffer[-len(configuration[1])-1]
-    if start==configuration[0] and stop==configuration[1]:
-        return decrptMessage(data)
-    return ''
-
-def checkJumper(jumper, output):
-    length=len(configuration[0])+len(configuration[1])+configuration[2]+1
+def checkJumper(clock, sda, output):
     buffer=[]
-    for i in range(length):
-        buffer.append('1')
+    with open(clock, 'r') as file:
+        state1=file.read()
+    with open(sda, 'r') as file:
+        state2=file.read()
+    mode='0'
     while True:
-        buffer.pop(0)
-        with open(jumper, 'r') as jp:
-            data=jp.read()
-            buffer.append(data)
-            print('Buffer data: ', ''.join(buffer))
-            string=decryptpacket(buffer)
-            print('Data packet:', string)
-            with open(output, 'r') as out:
-                data=out.read()
-                data+=string
+        with open(clock, 'r') as file:
+            tempstate1=file.read()
+        with open(sda, 'r') as file:
+            tempstate2=file.read()
+        if state1=='1' and state2=='1' and tempstate2=='0':
+            mode='1'
+            time.sleep(configuration[0]//2)
+        if state1=='1' and state2=='0' and tempstate2=='1':
+            mode='0'
+            time.sleep(configuration[0]//2)
+        state1=tempstate1
+        state2=tempstate2
+        if mode=='0':
+            if buffer!=[]:
+                data=decrptMessage(buffer)
                 with open(output, 'w') as out:
                     out.write(data)
-        time.sleep(configuration[3])
+                buffer=[]
+        else:
+            with open(sda, 'r') as jp:
+                data=jp.read()
+                buffer.append(data)
+            time.sleep(configuration[0])

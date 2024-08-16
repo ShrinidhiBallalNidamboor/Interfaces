@@ -1,3 +1,3 @@
 from Define import checkJumper
 
-checkJumper('T1-R2.txt', 'messageSlave.txt')
+checkJumper('Clock.txt', 'SDA.txt', 'messageSlave.txt')
