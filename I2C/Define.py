@@ -1,5 +1,6 @@
 import time
-configuration=[2]
+
+configuration=[4]
 
 def configure(speed_data):
     configuration[0]=speed_data
@@ -32,6 +33,7 @@ def synchronize(clock):
                 data=clk.read()
                 if data!=temp:
                     break
+
 def start(clock, sda):
     while True:        
         with open(clock, 'r') as file:
@@ -86,32 +88,19 @@ def decrptMessage(message):
 
 def checkJumper(clock, sda, output):
     buffer=[]
-    with open(clock, 'r') as file:
-        state1=file.read()
-    with open(sda, 'r') as file:
-        state2=file.read()
-    mode='0'
+    synchronize(clock)
+    time.sleep(configuration[0]//2)
     while True:
-        with open(clock, 'r') as file:
-            tempstate1=file.read()
-        with open(sda, 'r') as file:
-            tempstate2=file.read()
-        if state1=='1' and state2=='1' and tempstate2=='0':
-            mode='1'
-            time.sleep(configuration[0]//2)
-        if state1=='1' and state2=='0' and tempstate2=='1':
-            mode='0'
-            time.sleep(configuration[0]//2)
-        state1=tempstate1
-        state2=tempstate2
-        if mode=='0':
-            if buffer!=[]:
-                data=decrptMessage(buffer)
-                with open(output, 'w') as out:
-                    out.write(data)
-                buffer=[]
-        else:
-            with open(sda, 'r') as jp:
-                data=jp.read()
-                buffer.append(data)
+        with open('Type.txt', 'r') as tp:
+            mode=tp.read()
+            if mode=='0':
+                if buffer!=[]:
+                    data=decrptMessage(buffer)
+                    with open(output, 'w') as out:
+                        out.write(data)
+                    buffer=[]
+            else:
+                with open(sda, 'r') as jp:
+                    data=jp.read()
+                    buffer.append(data)
             time.sleep(configuration[0])
